@@ -78,8 +78,13 @@ def askai(text, system_prompt, template=None, stream=True):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("input", type=str, help="input text or file", nargs="?")
+    description = "Simple cmdline tool for asking an AI."
+    epilog = ""
+    if not HAS_SSECLIENT:
+        epilog = "Hint: To enable streaming output install the python sseclient module."
+
+    parser = argparse.ArgumentParser(description=description, epilog=epilog)
+    parser.add_argument("input", type=str, help="filename or input text", nargs="*")
     parser.add_argument(
         "-i",
         "--instruction",
@@ -105,11 +110,12 @@ def main():
     parser.add_argument(
         "-r", "--reason", help="Request a answer with reasoning", action="store_true"
     )
-    parser.add_argument(
-        "-n", "--no-streaming", help="Disable streaming", action="store_true"
-    )
+    if HAS_SSECLIENT:
+        parser.add_argument(
+            "-n", "--no-streaming", help="Disable streaming", action="store_true"
+        )
     args = parser.parse_args()
-    inpt = args.input
+    inpt = " ".join(args.input)
     instruction = args.instruction
 
     if inpt and os.path.isfile(inpt):
@@ -131,7 +137,8 @@ def main():
     if args.reason:
         instruction += "\nInclude your reasoning in the answer."
 
-    askai(text=inpt, system_prompt=instruction, template=args.template, stream=(not args.no_streaming))
+    stream = HAS_SSECLIENT and not args.no_streaming
+    askai(text=inpt, system_prompt=instruction, template=args.template, stream=stream)
 
 
 if __name__ == "__main__":
