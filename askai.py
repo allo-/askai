@@ -24,29 +24,55 @@ import requests
 import os
 import sys
 import argparse
+import json
+
+try:
+    import sseclient
+    HAS_SSECLIENT = True
+except ImportError:
+    HAS_SSECLIENT = False
 
 URL = (
     os.environ.get("LLM_API_BASEURL", "http://localhost:5000") + "/v1/chat/completions"
 )
 
 
-def askai(text, system_prompt, template=None):
+def askai(text, system_prompt, template=None, stream=True):
+    if not HAS_SSECLIENT:
+        stream = False
+
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": text},
     ]
+
     request = {
         "messages": messages,
         "mode": "instruct",
         "user_bio": "",
-        "max_new_tokens": 4096,
         "max_tokens": 4096,
+        "temperature": 1.0,
+        "top_p": 0.9,
+        "stream": stream,
     }
     if template:
         request["instruction_template"] = template
-    response = requests.post(URL, json=request)
+
+    response = requests.post(URL, json=request, stream=stream)
     if response.status_code == 200:
-        return response.json()["choices"][0]["message"]["content"].strip()
+        if stream:
+            import sseclient
+            client = sseclient.SSEClient(response)
+            try:
+                for event in client.events():
+                    payload = json.loads(event.data)
+                    chunk = payload['choices'][0]['delta']['content']
+                    print(chunk, end='', flush=True)
+                print()
+            except requests.exceptions.ChunkedEncodingError:
+                print("Error streaming the response.")
+        else:
+                print(response.json()["choices"][0]["message"]["content"].strip())
     else:
         print("Error while asking the AI.")
 
@@ -79,6 +105,9 @@ def main():
     parser.add_argument(
         "-r", "--reason", help="Request a answer with reasoning", action="store_true"
     )
+    parser.add_argument(
+        "-n", "--no-streaming", help="Disable streaming", action="store_true"
+    )
     args = parser.parse_args()
     inpt = args.input
     instruction = args.instruction
@@ -102,7 +131,7 @@ def main():
     if args.reason:
         instruction += "\nInclude your reasoning in the answer."
 
-    print(askai(text=inpt, system_prompt=instruction, template=args.template))
+    askai(text=inpt, system_prompt=instruction, template=args.template, stream=(not args.no_streaming))
 
 
 if __name__ == "__main__":
