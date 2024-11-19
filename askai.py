@@ -93,6 +93,13 @@ def main():
         default="You are a helpful AI assistant.",
     )
     parser.add_argument(
+        "-q",
+        "--question",
+        type=str,
+        help="prompt text or file",
+        default="",
+    )
+    parser.add_argument(
         "-t",
         "--template",
         help="Set the instruction template like Alpaca or ChatML",
@@ -117,6 +124,7 @@ def main():
     args = parser.parse_args()
     inpt = " ".join(args.input)
     instruction = args.instruction
+    question = args.question
 
     if inpt and os.path.isfile(inpt):
         with open(inpt, "r") as file:
@@ -127,6 +135,13 @@ def main():
     if os.path.isfile(instruction):
         with open(instruction, "r") as file:
             instruction = file.read()
+
+    if os.path.isfile(question):
+        with open(question, "r") as file:
+            question = file.read()
+
+    if question:
+        inpt = "Question: " + question + "\n\nInput:\n" + inpt
 
     if args.short:
         instruction += "\nGive a short reply only answering the question."
