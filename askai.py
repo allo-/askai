@@ -37,7 +37,7 @@ URL = (
 )
 
 
-def askai(text, system_prompt, template=None, stream=True, prefix=""):
+def askai(text, system_prompt, template=None, stream=True, hide_reasoning=False, prefix=""):
     if not HAS_SSECLIENT:
         stream = False
 
@@ -66,21 +66,42 @@ def askai(text, system_prompt, template=None, stream=True, prefix=""):
         if stream:
             import sseclient
             client = sseclient.SSEClient(response)
+            in_reasoning = False
             try:
                 for event in client.events():
                     try:
                         payload = json.loads(event.data)
                     except json.decoder.JSONDecodeError:
                         break
+                    chunk = payload['choices'][0]['delta']
+                    if payload["choices"] and "reasoning_content" in payload['choices'][0]['delta']:
+                        if hide_reasoning:
+                            continue
+                        if not in_reasoning:
+                            in_reasoning = True
+                            print("Thinking:")
+                            print("---------\n")
+                        if chunk["reasoning_content"]:
+                            print(chunk["reasoning_content"], end='', flush=True)
                     if payload["choices"] and "content" in payload['choices'][0]['delta']:
-                        chunk = payload['choices'][0]['delta']['content']
-                        if chunk:
-                            print(chunk, end='', flush=True)
+                        if in_reasoning:
+                            in_reasoning = False
+                            print("\n\nAnswer:")
+                            print("-------\n")
+                        if chunk["content"]:
+                            print(chunk["content"], end='', flush=True)
                 print()
             except requests.exceptions.ChunkedEncodingError:
                 print("Error streaming the response.")
         else:
-                print(response.json()["choices"][0]["message"]["content"].strip())
+            result = response.json()["choices"][0]["message"]
+            if not hide_reasoning and "reasoning_content" in result:
+                print("Thinking:")
+                print("---------\n")
+                print(result["reasoning_content"].strip())
+                print("\n\nAnswer:")
+                print("-------\n")
+            print(result["content"].strip())
     else:
         print("Error while asking the AI.")
 
@@ -132,6 +153,9 @@ def main():
         parser.add_argument(
             "-n", "--no-streaming", help="Disable streaming", action="store_true"
         )
+    parser.add_argument(
+        "--hide-reasoning", help="Hide reasoning", action="store_true"
+    )
     args = parser.parse_args()
     inpt = " ".join(args.input)
     instruction = args.instruction
@@ -164,7 +188,7 @@ def main():
         instruction += "\nInclude your reasoning in the answer."
 
     stream = HAS_SSECLIENT and not args.no_streaming
-    askai(text=inpt, system_prompt=instruction, template=args.template, stream=stream, prefix=args.prefix)
+    askai(text=inpt, system_prompt=instruction, template=args.template, stream=stream, hide_reasoning=args.hide_reasoning, prefix=args.prefix)
 
 
 if __name__ == "__main__":
