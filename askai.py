@@ -37,7 +37,7 @@ URL = (
 )
 
 
-def askai(text, system_prompt, template=None, stream=True):
+def askai(text, system_prompt, template=None, stream=True, prefix=""):
     if not HAS_SSECLIENT:
         stream = False
 
@@ -45,6 +45,9 @@ def askai(text, system_prompt, template=None, stream=True):
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": text},
     ]
+    if prefix:
+        messages.append({"role": "assistant", "content": prefix})
+        print(prefix, end="")
 
     request = {
         "messages": messages,
@@ -122,6 +125,9 @@ def main():
     parser.add_argument(
         "-r", "--reason", help="Request a answer with reasoning", action="store_true"
     )
+    parser.add_argument(
+        "-p", "--prefix", help="Start the answer with this prefix", default=""
+    )
     if HAS_SSECLIENT:
         parser.add_argument(
             "-n", "--no-streaming", help="Disable streaming", action="store_true"
@@ -158,7 +164,7 @@ def main():
         instruction += "\nInclude your reasoning in the answer."
 
     stream = HAS_SSECLIENT and not args.no_streaming
-    askai(text=inpt, system_prompt=instruction, template=args.template, stream=stream)
+    askai(text=inpt, system_prompt=instruction, template=args.template, stream=stream, prefix=args.prefix)
 
 
 if __name__ == "__main__":
