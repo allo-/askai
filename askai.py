@@ -65,9 +65,14 @@ def askai(text, system_prompt, template=None, stream=True):
             client = sseclient.SSEClient(response)
             try:
                 for event in client.events():
-                    payload = json.loads(event.data)
-                    chunk = payload['choices'][0]['delta']['content']
-                    print(chunk, end='', flush=True)
+                    try:
+                        payload = json.loads(event.data)
+                    except json.decoder.JSONDecodeError:
+                        break
+                    if payload["choices"] and "content" in payload['choices'][0]['delta']:
+                        chunk = payload['choices'][0]['delta']['content']
+                        if chunk:
+                            print(chunk, end='', flush=True)
                 print()
             except requests.exceptions.ChunkedEncodingError:
                 print("Error streaming the response.")
